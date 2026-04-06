@@ -144,7 +144,7 @@ export function useTaskStore() {
   // Update task
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     const id = parseInt(taskId, 10);
-    const body: Record<string, unknown> = {};
+    const body: Record<string, unknown> = { id };
     if (updates.title     !== undefined) body.title     = updates.title;
     if (updates.notes     !== undefined) body.notes     = updates.notes;
     if ('projectId' in updates)          body.projectId = updates.projectId ? parseInt(updates.projectId, 10) : null;
