@@ -19,13 +19,17 @@ function mapEntry(dto: ApiHistoryEntry, taskId: string): TaskHistoryEntry {
 export function useTaskHistory(taskId: string | null) {
   const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
 
-  useEffect(() => {
+  const fetchHistory = useCallback(async () => {
     if (!taskId) { setHistory([]); return; }
-
-    api.get<ApiHistoryEntry[]>(`/api/Tasks/${parseInt(taskId, 10)}/history`)
-      .then(data => setHistory(data.map(dto => mapEntry(dto, taskId))))
-      .catch(err => console.error('Error fetching task history:', err));
+    try {
+      const data = await api.get<ApiHistoryEntry[]>(`/api/Tasks/${parseInt(taskId, 10)}/history`);
+      setHistory(data.map(dto => mapEntry(dto, taskId)));
+    } catch (err) {
+      console.error('Error fetching task history:', err);
+    }
   }, [taskId]);
+
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   const addHistoryEvent = useCallback(async (params: {
     taskId: string;
@@ -47,5 +51,5 @@ export function useTaskHistory(taskId: string | null) {
     if (dto) setHistory(prev => [mapEntry(dto, params.taskId), ...prev]);
   }, []);
 
-  return { history, addHistoryEvent };
+  return { history, addHistoryEvent, refetchHistory: fetchHistory };
 }

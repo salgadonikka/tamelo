@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Task, Project, DayMarker, CircleState } from '@/types/task';
 import { format, startOfWeek, endOfWeek, addDays, isBefore, isSameDay, startOfDay } from 'date-fns';
 import { useDeviceType, getNavStep, getDayCount } from './useDeviceType';
@@ -39,6 +39,8 @@ function mapProject(dto: ApiProject): Project {
 export function useTaskStore() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksRef = useRef<Task[]>([]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [dayOffset, setDayOffset] = useState(0);
   const deviceType = useDeviceType();
@@ -144,10 +146,11 @@ export function useTaskStore() {
   // Update task
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     const id = parseInt(taskId, 10);
+    const currentTask = tasksRef.current.find(t => t.id === taskId);
     const body: Record<string, unknown> = { id };
-    if (updates.title     !== undefined) body.title     = updates.title;
-    if (updates.notes     !== undefined) body.notes     = updates.notes;
-    if ('projectId' in updates)          body.projectId = updates.projectId ? parseInt(updates.projectId, 10) : null;
+    body.title = updates.title ?? currentTask?.title ?? '';
+    if ('notes' in updates)     body.notes     = updates.notes ?? null;
+    if ('projectId' in updates) body.projectId = updates.projectId ? parseInt(updates.projectId, 10) : null;
     if (updates.sortOrder !== undefined) body.sortOrder = updates.sortOrder;
 
     if (updates.archived !== undefined) {

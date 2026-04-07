@@ -109,13 +109,19 @@ export function TaskDetail({
   const [editingNoteContent, setEditingNoteContent] = useState('');
 
   const { notes, addNote, updateNote, deleteNote } = useTaskNotes(task.id);
-  const { history, addHistoryEvent } = useTaskHistory(task.id);
+  const { history, addHistoryEvent, refetchHistory } = useTaskHistory(task.id);
 
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.notes || '');
     setProjectId(task.projectId);
   }, [task]);
+
+  // Refetch history when markers change (backend records marker history on each cycle)
+  useEffect(() => {
+    refetchHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.markers]);
 
   const handleTitleBlur = async () => {
     const trimmed = title.trim();
