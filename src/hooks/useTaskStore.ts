@@ -4,6 +4,7 @@ import { format, startOfWeek, endOfWeek, addDays, isBefore, isSameDay, startOfDa
 import { useDeviceType, getNavStep, getDayCount } from './useDeviceType';
 import { useAuth } from './useAuth';
 import { api } from '@/lib/apiClient';
+import { useToast } from '@/hooks/use-toast';
 
 export type SortOption = 'date';
 export type CompletedVisibility = 'show-week' | 'hide-all' | 'show-all';
@@ -38,6 +39,7 @@ function mapProject(dto: ApiProject): Project {
 
 export function useTaskStore() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const tasksRef = useRef<Task[]>([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
@@ -246,12 +248,10 @@ export function useTaskStore() {
     const id = parseInt(taskId, 10);
     const markerTimestamp = new Date().toISOString();
 
-    if (newState === null) {
-      await api.delete(`/api/DayMarkers/${id}/${dateStr}`);
-    } else {
-      await api.put(`/api/DayMarkers/${id}/${dateStr}`, { state: newState });
-    }
+    // Snapshot for rollback on API failure
+    const previousTasks = tasks;
 
+    // Optimistic update — reflect change in UI immediately
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
       let newMarkers = [...t.markers];
@@ -264,7 +264,18 @@ export function useTaskStore() {
       }
       return { ...t, markers: newMarkers };
     }));
-  }, [tasks]);
+
+    try {
+      if (newState === null) {
+        await api.delete(`/api/DayMarkers/${id}/${dateStr}`);
+      } else {
+        await api.put(`/api/DayMarkers/${id}/${dateStr}`, { state: newState });
+      }
+    } catch {
+      setTasks(previousTasks);
+      toast({ title: 'Failed to save', description: 'Could not update the marker. Please try again.', variant: 'destructive' });
+    }
+  }, [tasks, toast]);
 
   // Add project
   const addProject = useCallback(async (name: string) => {

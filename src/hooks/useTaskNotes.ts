@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 
 export interface TaskNote {
@@ -22,18 +23,16 @@ function mapNote(dto: ApiTaskNote): TaskNote {
 }
 
 export function useTaskNotes(taskId: string | null) {
-  const [notes, setNotes] = useState<TaskNote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!taskId) { setNotes([]); return; }
-
-    setLoading(true);
-    api.get<ApiTaskNote[]>(`/api/TaskNotes/${parseInt(taskId, 10)}`)
-      .then(data => setNotes(data.map(mapNote)))
-      .catch(err => console.error('Error fetching notes:', err))
-      .finally(() => setLoading(false));
-  }, [taskId]);
+  const { data: notes = [], isLoading: loading } = useQuery({
+    queryKey: ['task-notes', taskId],
+    queryFn: async () => {
+      const data = await api.get<ApiTaskNote[]>(`/api/TaskNotes/${parseInt(taskId!, 10)}`);
+      return data.map(mapNote);
+    },
+    enabled: !!taskId,
+  });
 
   const addNote = useCallback(async (content: string) => {
     if (!taskId) return null;
@@ -44,19 +43,28 @@ export function useTaskNotes(taskId: string | null) {
     });
 
     const newNote = mapNote(dto);
-    setNotes(prev => [newNote, ...prev]);
+    queryClient.setQueryData<TaskNote[]>(
+      ['task-notes', taskId],
+      old => [newNote, ...(old ?? [])]
+    );
     return newNote;
-  }, [taskId]);
+  }, [taskId, queryClient]);
 
   const updateNote = useCallback(async (noteId: string, content: string) => {
     await api.put(`/api/TaskNotes/${parseInt(noteId, 10)}`, { content });
-    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n));
-  }, []);
+    queryClient.setQueryData<TaskNote[]>(
+      ['task-notes', taskId],
+      old => (old ?? []).map(n => n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n)
+    );
+  }, [taskId, queryClient]);
 
   const deleteNote = useCallback(async (noteId: string) => {
     await api.delete(`/api/TaskNotes/${parseInt(noteId, 10)}`);
-    setNotes(prev => prev.filter(n => n.id !== noteId));
-  }, []);
+    queryClient.setQueryData<TaskNote[]>(
+      ['task-notes', taskId],
+      old => (old ?? []).filter(n => n.id !== noteId)
+    );
+  }, [taskId, queryClient]);
 
   return { notes, loading, addNote, updateNote, deleteNote };
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { TaskHistoryEntry, HistoryEventType } from '@/types/task';
 
@@ -17,19 +18,17 @@ function mapEntry(dto: ApiHistoryEntry, taskId: string): TaskHistoryEntry {
 }
 
 export function useTaskHistory(taskId: string | null) {
-  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
+  const queryClient = useQueryClient();
 
-  const fetchHistory = useCallback(async () => {
-    if (!taskId) { setHistory([]); return; }
-    try {
-      const data = await api.get<ApiHistoryEntry[]>(`/api/Tasks/${parseInt(taskId, 10)}/history`);
-      setHistory(data.map(dto => mapEntry(dto, taskId)));
-    } catch (err) {
-      console.error('Error fetching task history:', err);
-    }
-  }, [taskId]);
-
-  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  const { data: history = [] } = useQuery({
+    queryKey: ['task-history', taskId],
+    queryFn: async () => {
+      const data = await api.get<ApiHistoryEntry[]>(`/api/Tasks/${parseInt(taskId!, 10)}/history`);
+      return data.map(dto => mapEntry(dto, taskId!));
+    },
+    enabled: !!taskId,
+    staleTime: 0, // Always fetch fresh history when a task is opened
+  });
 
   const addHistoryEvent = useCallback(async (params: {
     taskId: string;
@@ -48,8 +47,14 @@ export function useTaskHistory(taskId: string | null) {
       }
     ).catch(err => { console.error('Error writing task history:', err); return null; });
 
-    if (dto) setHistory(prev => [mapEntry(dto, params.taskId), ...prev]);
-  }, []);
+    if (dto) {
+      const newEntry = mapEntry(dto, params.taskId);
+      queryClient.setQueryData<TaskHistoryEntry[]>(
+        ['task-history', params.taskId],
+        old => [newEntry, ...(old ?? [])]
+      );
+    }
+  }, [queryClient]);
 
-  return { history, addHistoryEvent, refetchHistory: fetchHistory };
+  return { history, addHistoryEvent };
 }

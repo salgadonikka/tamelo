@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { DataExportImport } from '@/components/DataExportImport';
@@ -30,35 +30,28 @@ const archiveOptions = [
 const Settings = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [autoArchiveDays, setAutoArchiveDays] = useState<string>('30');
 
   useEffect(() => {
-    if (!user) return;
-    const fetchProfile = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('auto_archive_days')
-        .eq('user_id', user.id)
-        .single();
-      if (data) {
-        setAutoArchiveDays(String((data as Record<string, unknown>).auto_archive_days ?? 30));
-      }
-    };
-    fetchProfile();
-  }, [user]);
+    if (profile) {
+      setAutoArchiveDays(String(profile.autoArchiveDays ?? 30));
+    }
+  }, [profile]);
 
   const handleAutoArchiveChange = async (value: string) => {
     setAutoArchiveDays(value);
     if (!user) return;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ auto_archive_days: parseInt(value) } as Record<string, unknown>)
-      .eq('user_id', user.id);
-    if (error) {
-      toast.error('Failed to update setting');
-    } else {
+    try {
+      await api.put('/api/UserProfiles/me', {
+        email: profile?.email ?? null,
+        displayName: profile?.displayName ?? null,
+        avatarUrl: profile?.avatarUrl ?? null,
+        autoArchiveDays: parseInt(value),
+      });
       toast.success('Auto-archive setting saved');
+    } catch {
+      toast.error('Failed to update setting');
     }
   };
 

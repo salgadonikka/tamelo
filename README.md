@@ -20,7 +20,7 @@ The React frontend for **Tamelo**, *The Procrastinator's To Do List* — a weekl
 
 - **Node.js** 20 or later
 - A running instance of [Tamelo.Api](https://github.com/salgadonikka/tamelo-api)
-- A **Supabase project** for authentication (database is managed by the API)
+- A **Supabase project** for authentication — used only for auth (sign-in, JWTs); the database is owned by Tamelo.Api and is not on Supabase
 
 ## Getting Started
 
